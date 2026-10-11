@@ -71,7 +71,9 @@ include(AutoCollect)
 include(Macros)
 
 find_package(PCHSupport)
-find_package(MySQL)
+if(SERVERS)
+  find_package(MySQL)
+endif()
 
 if(NOT WITHOUT_GIT)
   find_package(Git 1.7)

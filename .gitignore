@@ -1,0 +1,64 @@
+# ==========================================
+# Build Artifacts & Binaries
+# ==========================================
+build/
+build_*/
+bin/
+lib/
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+*.ilk
+*.obj
+*.o
+*.a
+*.lib
+
+# ==========================================
+# IDEs & Editors & Caches
+# ==========================================
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosv
+*.sln.docstates
+*.opensdf
+*.sdf
+
+# ==========================================
+# AI Agents & IDE Cache (Antigravity / Gemini)
+# ==========================================
+.gemini/
+.antigravity/
+.agents/
+scratch/
+
+# ==========================================
+# Sensitive Data, Backups & Credentials
+# ==========================================
+*.conf
+*.conf.dist
+my.ini
+*.dump
+*.bak
+*.sql.gz
+*.zip
+*.7z
+*.tar.gz
+db_dumps/
+dump/
+*.sql
+!sql/**
+
+# ==========================================
+# Logs & Temp Caches
+# ==========================================
+*.log
+logs/
+cache/
+temp/
+tmp/

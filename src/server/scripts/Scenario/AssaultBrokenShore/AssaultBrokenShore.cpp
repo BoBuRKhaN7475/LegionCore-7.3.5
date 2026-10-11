@@ -116,10 +116,16 @@ struct npc_broken_shore_misc : ScriptedAI
         if (!justSawByPlayer)
         {
             if (me->GetEntry() == 119133)
+            {
                 if (me->IsWithinDistInMap(who, 40.0f))
+                {
+                    if (instance && instance->getScenarionStep() == 0)
+                        who->ToPlayer()->UpdateAchievementCriteria(CRITERIA_TYPE_SCRIPT_EVENT_2, 56460);
                     instance->onScenarionNextStep(20); // custom
+                }
                 else
                     return;
+            }
             
             justSawByPlayer = true;
             
@@ -302,6 +308,9 @@ struct npc_arcane_raven : ScriptedAI
 {
     npc_arcane_raven(Creature* creature) : ScriptedAI(creature) {}
 
+    ObjectGuid passengerGuid;
+    bool arrived = false;
+
     void IsSummonedBy(Unit* summoner) override
     {
         SetFlyMode(true);
@@ -310,14 +319,18 @@ struct npc_arcane_raven : ScriptedAI
     
     void PassengerBoarded(Unit* who, int8 /*seatId*/, bool apply) override
     {
-        bool isPlayer = who->IsPlayer();
-        me->AddDelayedEvent(4000, [this, isPlayer]() -> void
+        if (apply)
         {
-            if (isPlayer)
-                me->GetMotionMaster()->MovePath(11322708, false);
-            else
-                me->GetMotionMaster()->MovePath(11322708, false, irand(-15, 15), irand(-15, 15));
-        });
+            passengerGuid = who->GetGUID();
+            bool isPlayer = who->IsPlayer();
+            me->AddDelayedEvent(4000, [this, isPlayer]() -> void
+            {
+                if (isPlayer)
+                    me->GetMotionMaster()->MovePath(11322708, false);
+                else
+                    me->GetMotionMaster()->MovePath(11322708, false, irand(-15, 15), irand(-15, 15));
+            });
+        }
     }
     
     void MovementInform(uint32 moveType, uint32 pointId) override
@@ -325,25 +338,83 @@ struct npc_arcane_raven : ScriptedAI
         if (moveType != WAYPOINT_MOTION_TYPE)
             return;
 
-        if (pointId == 20 && me->GetAnyOwner())
+        if (pointId >= 20)
+            OnArrival();
+    }
+
+    void LastWPReached() override
+    {
+        OnArrival();
+    }
+
+    void OnArrival()
+    {
+        if (arrived)
+            return;
+        arrived = true;
+
+        Player* player = nullptr;
+        if (Vehicle* veh = me->GetVehicleKit())
+            if (Unit* pass = veh->GetPassenger(0))
+                player = pass->ToPlayer();
+
+        if (!player && passengerGuid)
+            player = ObjectAccessor::GetPlayer(*me, passengerGuid);
+
+        if (!player)
+            if (Unit* summoner = me->ToTempSummon() ? me->ToTempSummon()->GetSummoner() : nullptr)
+                player = summoner->ToPlayer();
+
+        if (!player)
+            if (Unit* owner = me->GetAnyOwner())
+                player = owner->ToPlayer();
+
+        if (!player)
+            player = me->FindNearestPlayer(50.0f);
+
+        if (player)
         {
-            if (me->GetAnyOwner()->IsPlayer())
-            {
-                me->GetAnyOwner()->CreateConversation(4828);
-                me->GetAnyOwner()->ToPlayer()->UpdateAchievementCriteria(CRITERIA_TYPE_SCRIPT_EVENT_2, 56460);
-                if (Creature* infernal = me->SummonCreature(118416, me->GetPositionX() + 5, me->GetPositionY() + 5, me->GetPositionZ()))
-                {
-                    infernal->CastSpell(infernal, 205266);
-                    if (Creature* mag = infernal->FindNearestCreature(118412, 30.0f, true))
-                    {
-                        mag->CastSpell(mag, 46604);
-                        mag->AI()->Talk(0);
-                    }
-                    infernal->CastSpell(infernal, 239649);
-                }
-            }
-            me->DespawnOrUnsummon(500);
+            // Apply parachute and slow fall BEFORE ejecting from vehicle to prevent lethal fall damage
+            player->AddAura(55001, player); // Parachute (SPELL_AURA_FEATHER_FALL)
+            player->AddAura(130, player);   // Slow Fall (SPELL_AURA_FEATHER_FALL - 30 seconds)
         }
+
+        if (Vehicle* veh = me->GetVehicleKit())
+            veh->RemoveAllPassengers();
+
+        if (player)
+        {
+            // Ensure safety auras are active after vehicle ejection
+            player->AddAura(55001, player);
+            player->AddAura(130, player);
+
+            float targetX = player->GetPositionX();
+            float targetY = player->GetPositionY();
+            float targetZ = player->GetPositionZ();
+            float groundZ = me->GetMap()->GetHeight(player->GetPhaseMask(), targetX, targetY, targetZ);
+
+            if (groundZ > -50.0f && groundZ < 200.0f)
+                targetZ = groundZ + 0.5f;
+
+            // Teleport safely to the beach ground and clear fall information
+            player->SetFallInformation(0, targetZ);
+            player->NearTeleportTo(targetX, targetY, targetZ, player->GetOrientation());
+            player->SetFallInformation(0, targetZ);
+
+            player->CreateConversation(4828);
+            player->UpdateAchievementCriteria(CRITERIA_TYPE_SCRIPT_EVENT_2, 56460);
+            if (Creature* infernal = me->SummonCreature(118416, me->GetPositionX() + 5, me->GetPositionY() + 5, me->GetPositionZ()))
+            {
+                infernal->CastSpell(infernal, 205266);
+                if (Creature* mag = infernal->FindNearestCreature(118412, 30.0f, true))
+                {
+                    mag->CastSpell(mag, 46604);
+                    mag->AI()->Talk(0);
+                }
+                infernal->CastSpell(infernal, 239649);
+            }
+        }
+        me->DespawnOrUnsummon(500);
     }
 };
 

@@ -49,6 +49,8 @@ struct instance_AssaultBrokenShore : public InstanceScript
             case 118453:
             case 118886:
             case 118456:
+                if (getScenarionStep() == 0)
+                    updateCriteriaForPlayers(56460);
                 updateCriteriaForPlayers(56697);
                 break;
                 // 3
@@ -87,6 +89,10 @@ struct instance_AssaultBrokenShore : public InstanceScript
             return;
 
         player->CastSpell(player, 240155);
+
+        // Fallback: If player relogs/enters already on the beach but stage 0 is not yet finished
+        if (getScenarionStep() == 0 && player->GetPositionZ() < 50.0f && player->GetPositionX() < -1500.0f)
+            player->UpdateAchievementCriteria(CRITERIA_TYPE_SCRIPT_EVENT_2, 56460);
     }
 
     void updateCriteriaForPlayers(uint32 objective)
@@ -98,10 +104,7 @@ struct instance_AssaultBrokenShore : public InstanceScript
 
         for (Map::PlayerList::const_iterator i = PlList.begin(); i != PlList.end(); ++i)
             if (Player* player = i->getSource())
-            {
                 player->UpdateAchievementCriteria(CRITERIA_TYPE_SCRIPT_EVENT_2, objective);
-                break;
-            }
     }
 
     void OnCreatureCreate(Creature* creature) override
